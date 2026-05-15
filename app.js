@@ -6,13 +6,20 @@ const cors=require('cors');
 
 const app=express();
 
-app.use(cors());
+const allowedOrigins = [
+    process.env.FRONTEND_URL || "https://chess-frontend-woad.vercel.app",
+    "http://localhost:5173"
+];
+
+app.use(cors({
+    origin: allowedOrigins
+}));
 
 const server = http.createServer(app);
 
 const io = socket(server, {
     cors: {
-        origin: "https://chess-frontend-woad.vercel.app/",
+        origin: allowedOrigins,
         methods: ["GET", "POST"]
     }
 });
@@ -20,8 +27,20 @@ const io = socket(server, {
 const chess = new Chess();
 let players={};
 
+function clearStalePlayers() {
+    if(players.white && !io.sockets.sockets.has(players.white)){
+        delete players.white;
+    }
+
+    if(players.black && !io.sockets.sockets.has(players.black)){
+        delete players.black;
+    }
+}
+
 io.on("connection",function(uniquesocket){
     console.log('connected');
+
+    clearStalePlayers();
 
     if(!players.white){
         players.white = uniquesocket.id;
@@ -34,6 +53,8 @@ io.on("connection",function(uniquesocket){
     else{
         uniquesocket.emit('spectatorRole')
     }
+
+    console.log('players:', players);
 
     uniquesocket.emit('boardState', chess.fen());
     

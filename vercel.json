@@ -1,5 +1,8 @@
 {
  "version": 2,
+ "env": {
+  "FRONTEND_URL": "https://chess-frontend-woad.vercel.app"
+ },
  "builds": [
   {
    "src": "app.js",
