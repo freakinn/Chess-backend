@@ -12,7 +12,7 @@ const server = http.createServer(app);
 
 const io = socket(server, {
     cors: {
-        origin: "http://localhost:5173",
+        origin: "https://chess-frontend-woad.vercel.app/",
         methods: ["GET", "POST"]
     }
 });
@@ -94,4 +94,8 @@ io.on("connection",function(uniquesocket){
     })
 })
 
-server.listen(3000);
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, () => {
+    console.log("server running");
+});
