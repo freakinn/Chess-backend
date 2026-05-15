@@ -1,0 +1,97 @@
+const express=require('express');
+const socket=require('socket.io');
+const http=require('http');
+const {Chess} = require('chess.js');
+const cors=require('cors');
+
+const app=express();
+
+app.use(cors());
+
+const server = http.createServer(app);
+
+const io = socket(server, {
+    cors: {
+        origin: "http://localhost:5173",
+        methods: ["GET", "POST"]
+    }
+});
+
+const chess = new Chess();
+let players={};
+
+io.on("connection",function(uniquesocket){
+    console.log('connected');
+
+    if(!players.white){
+        players.white = uniquesocket.id;
+        uniquesocket.emit('playerRole','w')
+    }
+    else if(!players.black){
+        players.black = uniquesocket.id;
+        uniquesocket.emit('playerRole','b')
+    }
+    else{
+        uniquesocket.emit('spectatorRole')
+    }
+
+    uniquesocket.emit('boardState', chess.fen());
+    
+    uniquesocket.on('disconnect',function(){
+        if(uniquesocket.id===players.white){
+            delete players.white;
+        }
+        else if(uniquesocket.id===players.black){
+            delete players.black;
+        }
+
+        if(!players.white && !players.black){
+            chess.reset();
+        }
+    })
+
+    uniquesocket.on('move',function(move, callback){
+        try {
+            if(chess.turn()=='w' && uniquesocket.id !== players.white) {
+                if(typeof callback === 'function') {
+                    callback({ ok: false, fen: chess.fen(), error: 'Not white turn/player' });
+                }
+                uniquesocket.emit('boardState', chess.fen());
+                return;
+            }
+            if(chess.turn()=='b' && uniquesocket.id !== players.black) {
+                if(typeof callback === 'function') {
+                    callback({ ok: false, fen: chess.fen(), error: 'Not black turn/player' });
+                }
+                uniquesocket.emit('boardState', chess.fen());
+                return;
+            }
+
+            const result = chess.move(move);
+            if(result){
+                if(typeof callback === 'function') {
+                    callback({ ok: true, fen: chess.fen() });
+                }
+                io.emit('boardState', chess.fen())
+            }
+            else{
+                console.log("invalid move :",move);
+                if(typeof callback === 'function') {
+                    callback({ ok: false, fen: chess.fen(), error: 'Illegal move' });
+                }
+                uniquesocket.emit("invalidmove", move);
+                uniquesocket.emit('boardState', chess.fen());
+            }
+        } 
+        catch (err) {
+            console.log(err);
+            if(typeof callback === 'function') {
+                callback({ ok: false, fen: chess.fen(), error: err.message });
+            }
+            uniquesocket.emit('invalidmove',move);
+            uniquesocket.emit('boardState', chess.fen());
+        }
+    })
+})
+
+server.listen(3000);
